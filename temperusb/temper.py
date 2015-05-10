@@ -33,7 +33,7 @@ COMMANDS = {
     'ini2': '\x01\x86\xff\x01\x00\x00\x00\x00',
 }
 LOGGER = logging.getLogger(__name__)
-
+LOGGER.setLevel(logging.ERROR)
 
 def readattr(path, name):
     """
@@ -88,6 +88,15 @@ class TemperDevice(object):
         self.set_calibration_data()
         LOGGER.debug('Found device | Bus:{0} Ports:{1}'.format(
             self._bus, self._ports))
+        LOGGER.debug('             | Vendor:0x{:04x} Ports:0x{:04x}'.format(
+            self._device.idVendor, self._device.idProduct))
+        self._description=usb.util.get_string(self._device,256,2)
+        LOGGER.debug('             | {}'.format(
+            self._description))
+        if self._description == 'TEMPer1F_V1.3':
+            self._byteoffset=4
+        else:
+            self._byteoffset=2
 
     def set_calibration_data(self):
         """
@@ -168,8 +177,10 @@ class TemperDevice(object):
                 LOGGER.error(err)
                 raise
         # Interpret device response
+        LOGGER.debug('Read value form byte #%1i' %  self._byteoffset)
         data_s = "".join([chr(byte) for byte in data])
-        temp_c = 125.0/32000.0*(struct.unpack('>h', data_s[2:4])[0])
+        bytes=struct.unpack('>h', data_s[self._byteoffset:(self._byteoffset+2)])[0]
+        temp_c = 125.0/32000.0*bytes
         temp_c = temp_c * self._scale + self._offset
         if format == 'celsius':
             return temp_c
